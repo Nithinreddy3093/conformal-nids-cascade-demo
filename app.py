@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import html
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
-HOST, PORT = "127.0.0.1", 8085
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8085"))
 FEATURES = ["duration_ms", "fwd_packets", "bwd_packets", "bytes_total",
             "dst_port", "syn_count", "iat_mean_ms"]
 
