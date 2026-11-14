@@ -4,4 +4,7 @@ __pycache__/
 venv/
 .env
 .DS_Store
-
+# External datasets and generated experiment output
+/data/
+/results/
+*.joblib
