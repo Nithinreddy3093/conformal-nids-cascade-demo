@@ -87,6 +87,33 @@ class ResearchPipelineTests(unittest.TestCase):
         priorities = hybrid_priority(frame)
         self.assertGreater(priorities[0], priorities[1])
 
+    def test_overlapping_reused_tuple_is_reported_ambiguous(self):
+        rows = {
+            "Timestamp": ["7/7/2017 10:00:00 AM", "7/7/2017 10:00:01 AM"],
+            "Source IP": ["10.0.0.1", "10.0.0.1"], "Source Port": [51515, 51515],
+            "Destination IP": ["192.0.2.4", "192.0.2.4"],
+            "Destination Port": [443, 443], "Protocol": [6, 6],
+            "Flow Duration": [3_000_000, 3_000_000], "Total Fwd Packets": [4, 4],
+            "Total Backward Packets": [3, 3], "Total Length of Fwd Packets": [1200, 1200],
+            "Total Length of Bwd Packets": [700, 700], "SYN Flag Count": [1, 1],
+            "Flow IAT Mean": [250_000, 250_000], "Label": ["BENIGN", "BENIGN"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            csv_path, eve_path = root / "flows.csv", root / "eve.json"
+            pd.DataFrame(rows).to_csv(csv_path, index=False)
+            flows = load_flows(csv_path)
+            event = {
+                "event_type": "alert", "timestamp": "2017-07-07T10:00:01.000000+0000",
+                "src_ip": "192.0.2.4", "src_port": 443, "dest_ip": "10.0.0.1",
+                "dest_port": 51515, "proto": "TCP", "alert": {"severity": 1},
+            }
+            eve_path.write_text(json.dumps(event) + "\\n", encoding="utf-8")
+            alignment = attach_suricata_alerts(flows, eve_path, tolerance_seconds=0)
+            self.assertEqual(alignment["ambiguous_alert_events"], 1)
+            self.assertEqual(alignment["matched_alert_events"], 0)
+            self.assertFalse(flows.signature_hit.any())
+
     def test_replay_manifest_rejects_mismatched_eve(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
