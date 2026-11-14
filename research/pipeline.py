@@ -303,6 +303,19 @@ def sha256_path(path):
     raise FileNotFoundError(path)
 
 
+
+def project_revision():
+    """Return the checked-out repository commit, if this run came from a Git checkout."""
+    repository_root = Path(__file__).resolve().parent.parent
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repository_root,
+            check=True, capture_output=True, text=True, timeout=5
+        )
+        return result.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+
 def suricata_version():
     try:
         result = subprocess.run(["suricata", "-V"], check=False, capture_output=True,
@@ -423,6 +436,7 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
                if ruleset_path else {}),
         },
         "software": {
+            "project_git_commit": project_revision(),
             "python": platform.python_version(), "numpy": np.__version__,
             "pandas": pd.__version__, "scikit_learn": __import__("sklearn").__version__,
             "suricata": replay_manifest.get("suricata_version", "unknown"),
