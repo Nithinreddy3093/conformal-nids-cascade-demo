@@ -82,7 +82,7 @@ def load_flows(csv_path):
     out["duration"] = out["duration"] / 1_000_000.0
     out["iat"] = out["iat"] / 1_000_000.0
     out = out.dropna(subset=["timestamp", "src_port", "dst_port", "label_raw"])
-    out["start_epoch"] = out["timestamp"].astype("int64") / 1e9
+    out["start_epoch"] = out["timestamp"].map(lambda ts: ts.timestamp())
     out["end_epoch"] = out["start_epoch"] + out["duration"].clip(lower=0)
     out["flow_key"] = [
         canonical_key(a, b, c, d, p)
@@ -236,7 +236,7 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
     pred_sets = conformal_sets(cal_probs, cal.y.to_numpy(), test_probs, classes, alpha)
     test["p_attack"] = test_probs[:, list(classes).index(1)]
     test["pred_set"] = pred_sets
-    test["window"] = ((test.timestamp.astype("int64") / 1e9) // window_seconds).astype("int64")
+    test["window"] = (test.timestamp.map(lambda ts: ts.timestamp()) // window_seconds).astype("int64")
     test["signature_hit"] = test.signature_hit.astype(bool)
     budget = max(1, int(budget))
     ml_ids = select_topk(test, budget, "p_attack")
