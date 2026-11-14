@@ -40,7 +40,7 @@ class ResearchPipelineTests(unittest.TestCase):
             pd.DataFrame(columns).to_csv(csv_path, index=False)
             flows = load_flows(csv_path)
             self.assertAlmostEqual(flows.iloc[0].duration, 2.0)
-            self.assertAlmostEqual(flows.iloc[0].iat, .25)
+            self.assertAlmostEqual(flows.iloc[0]["iat"], .25)
             event = {
                 "event_type": "alert", "timestamp": "2017-07-07T10:00:01.000000+0000",
                 "src_ip": "192.0.2.4", "src_port": 443, "dest_ip": "10.0.0.1",
