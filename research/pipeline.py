@@ -92,7 +92,7 @@ def load_flows(csv_path, flow_timezone="UTC"):
     implicit_pm_adjusted_rows = 0
     if not isinstance(parsed_timestamps.dtype, pd.DatetimeTZDtype):
         # The published CIC-IDS2017 CSV omits AM/PM; 1-7 represent afternoon hours.
-        has_meridiem = raw_timestamps.str.contains(r"\\b(?:AM|PM)\\b", case=False, na=False)
+        has_meridiem = raw_timestamps.str.contains(r"\b(?:AM|PM)\b", case=False, na=False)
         implicit_pm = parsed_timestamps.dt.hour.between(1, 7) & ~has_meridiem
         implicit_pm_adjusted_rows = int(implicit_pm.sum())
         parsed_timestamps = parsed_timestamps + pd.to_timedelta(
