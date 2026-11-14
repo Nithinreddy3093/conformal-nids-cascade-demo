@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import hashlib
+import ipaddress
 import json
 import platform
 import subprocess
@@ -45,7 +46,7 @@ def canonical_key(src, sport, dst, dport, proto):
     """Direction-independent flow key; addresses remain strings to preserve IPv6."""
     left, right = (str(src), int(float(sport))), (str(dst), int(float(dport)))
     a, b = sorted((left, right))
-    p = PROTO.get(str(proto).strip(), str(proto).strip().upper())
+    p = normalize_protocol(proto)
     return a[0], a[1], b[0], b[1], p
 
 
@@ -59,38 +60,91 @@ def pick_column(columns, aliases, required=True):
     return None
 
 
+def normalize_protocol(value):
+    value = str(value).strip().upper()
+    if value.endswith(".0") and value[:-2].isdigit():
+        value = value[:-2]
+    return PROTO.get(value, value)
+
+
+def normalize_ip(value):
+    if pd.isna(value):
+        return None
+    try:
+        return ipaddress.ip_address(str(value).strip()).compressed
+    except ValueError:
+        return None
+
+
 def load_flows(csv_path):
     df = pd.read_csv(csv_path, low_memory=False)
     df.columns = [str(c).strip() for c in df.columns]
-    cols = {name: pick_column(df.columns, aliases, name not in {"src_ip","src_port","dst_ip","dst_port"})
+    cols = {name: pick_column(df.columns, aliases, name not in {"src_ip", "src_port", "dst_ip", "dst_port"})
             for name, aliases in ALIASES.items()}
-    # CICFlowMeter files can omit endpoint fields only in ML-ready exports.
     for name in ("src_ip", "src_port", "dst_ip", "dst_port"):
         if cols[name] is None:
             raise ValueError(f"{name} is required for Suricata alignment; use the original labeled-flow CSV.")
-    out = pd.DataFrame()
+
+    out = pd.DataFrame(index=df.index)
     out["timestamp"] = pd.to_datetime(df[cols["timestamp"]], errors="coerce", utc=True, dayfirst=False)
-    out["src_ip"], out["src_port"] = df[cols["src_ip"]].astype(str), pd.to_numeric(df[cols["src_port"]], errors="coerce")
-    out["dst_ip"], out["dst_port"] = df[cols["dst_ip"]].astype(str), pd.to_numeric(df[cols["dst_port"]], errors="coerce")
-    out["protocol"] = df[cols["protocol"]].astype(str)
-    out["label_raw"] = df[cols["label"]].astype(str).str.strip()
-    out["y"] = (out["label_raw"].str.casefold() != "benign").astype("int8")
-    for f in FEATURES:
-        source = cols.get(f)
-        out[f] = pd.to_numeric(df[source], errors="coerce") if source else np.nan
-    # CICFlowMeter duration and IAT are in microseconds; convert to seconds.
+    out["src_ip"] = df[cols["src_ip"]].map(normalize_ip)
+    out["dst_ip"] = df[cols["dst_ip"]].map(normalize_ip)
+    out["src_port"] = pd.to_numeric(df[cols["src_port"]], errors="coerce")
+    out["dst_port"] = pd.to_numeric(df[cols["dst_port"]], errors="coerce")
+    out["protocol"] = df[cols["protocol"]].map(normalize_protocol)
+    out["label_raw"] = df[cols["label"]].astype("string").str.strip()
+    for feature in FEATURES:
+        source = cols.get(feature)
+        out[feature] = pd.to_numeric(df[source], errors="coerce") if source else np.nan
+    # CICFlowMeter duration and IAT are microseconds; normalize to seconds.
     out["duration"] = out["duration"] / 1_000_000.0
     out["iat"] = out["iat"] / 1_000_000.0
-    out = out.dropna(subset=["timestamp", "src_port", "dst_port", "label_raw"])
+
+    valid = (
+        out["timestamp"].notna()
+        & out["src_ip"].notna()
+        & out["dst_ip"].notna()
+        & out["src_port"].notna()
+        & out["dst_port"].notna()
+        & out["src_port"].between(0, 65535)
+        & out["dst_port"].between(0, 65535)
+        & (out["src_port"] % 1 == 0)
+        & (out["dst_port"] % 1 == 0)
+        & out["protocol"].notna()
+        & (out["protocol"] != "<NA>")
+        & out["label_raw"].notna()
+        & out["label_raw"].ne("")
+        & out["duration"].notna()
+        & out["duration"].ge(0)
+    )
+    input_rows = len(out)
+    audit = {
+        "input_rows": int(input_rows),
+        "retained_rows": int(valid.sum()),
+        "dropped_rows": int((~valid).sum()),
+        "invalid_timestamp_rows": int(out["timestamp"].isna().sum()),
+        "invalid_endpoint_rows": int((out["src_ip"].isna() | out["dst_ip"].isna()).sum()),
+        "invalid_port_rows": int((out["src_port"].isna() | out["dst_port"].isna()
+                                  | ~out["src_port"].between(0, 65535)
+                                  | ~out["dst_port"].between(0, 65535)
+                                  | (out["src_port"] % 1 != 0) | (out["dst_port"] % 1 != 0)).sum()),
+        "invalid_protocol_rows": int((out["protocol"].isna() | out["protocol"].eq("<NA>")).sum()),
+        "missing_label_rows": int((out["label_raw"].isna() | out["label_raw"].eq("")).sum()),
+        "invalid_duration_rows": int((out["duration"].isna() | out["duration"].lt(0)).sum()),
+    }
+    out = out.loc[valid].copy()
+    out["y"] = (out["label_raw"].str.casefold() != "benign").astype("int8")
     out["start_epoch"] = out["timestamp"].map(lambda ts: ts.timestamp())
-    out["end_epoch"] = out["start_epoch"] + out["duration"].clip(lower=0)
+    out["end_epoch"] = out["start_epoch"] + out["duration"]
     out["flow_key"] = [
         canonical_key(a, b, c, d, p)
         for a, b, c, d, p in zip(out.src_ip, out.src_port, out.dst_ip, out.dst_port, out.protocol)
     ]
     out["signature_hit"] = False
     out["signature_score"] = 0.0
-    return out.reset_index(drop=True)
+    out = out.reset_index(drop=True)
+    out.attrs["ingestion_audit"] = audit
+    return out
 
 
 def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
