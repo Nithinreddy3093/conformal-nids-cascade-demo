@@ -67,7 +67,7 @@ python research/pipeline.py \
   --window-seconds 900 \
   --alpha 0.10 \
   --alignment-tolerance 2.0 \
-  --flow-timezone UTC \
+  --flow-timezone America/Moncton \
   --dataset-source https://huggingface.co/datasets/bencorn/CICIDS2017 \
   --dataset-revision c5637a4d7582337ef60cfb20b77227fbfe687ed6 \
   --ruleset /path/to/suricata/rules
