@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows, run, sha256_path, verify_replay_manifest
+from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows, run, sha256_path, verify_artifact_manifest, verify_replay_manifest
 from replay_suricata import count_eve_events
 
 
@@ -239,6 +239,14 @@ class ResearchPipelineTests(unittest.TestCase):
             self.assertTrue((out_path / "test_flows.csv").is_file())
             self.assertTrue((out_path / "report.json").is_file())
             self.assertTrue((out_path / "run_metadata.json").is_file())
+            self.assertTrue((out_path / "artifact_manifest.json").is_file())
+            self.assertEqual(
+                verify_artifact_manifest(out_path / "artifact_manifest.json")["count"], 3
+            )
+            with (out_path / "report.json").open("a", encoding="utf-8") as report_file:
+                report_file.write("tampered")
+            with self.assertRaisesRegex(ValueError, "Artifact SHA-256 mismatch"):
+                verify_artifact_manifest(out_path / "artifact_manifest.json")
             selected = pd.read_csv(out_path / "test_flows.csv")
             selected["window"] = (
                 pd.to_datetime(selected["timestamp"], utc=True).map(lambda x: x.timestamp()) // 15
