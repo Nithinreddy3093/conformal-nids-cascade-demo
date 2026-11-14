@@ -450,6 +450,29 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
     return report
 
 
+
+def verify_artifact_manifest(manifest_path):
+    """Verify hashes and sizes for every file listed in an artifact manifest."""
+    manifest_path = Path(manifest_path).resolve()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    outputs = manifest.get("outputs")
+    if manifest.get("schema_version") != 1 or not isinstance(outputs, dict) or not outputs:
+        raise ValueError("Artifact manifest has an unsupported or empty schema.")
+    root = manifest_path.parent
+    verified = []
+    for relative, expected in outputs.items():
+        path = (root / relative).resolve()
+        if root not in path.parents:
+            raise ValueError(f"Artifact path escapes the manifest directory: {relative}")
+        if not path.is_file():
+            raise FileNotFoundError(f"Artifact listed in manifest is missing: {path}")
+        if sha256_path(path) != expected.get("sha256"):
+            raise ValueError(f"Artifact SHA-256 mismatch: {relative}")
+        if path.stat().st_size != expected.get("bytes"):
+            raise ValueError(f"Artifact size mismatch: {relative}")
+        verified.append(relative)
+    return {"verified": verified, "count": len(verified)}
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flows-csv", required=True, help="CICFlowMeter labeled flow CSV")
