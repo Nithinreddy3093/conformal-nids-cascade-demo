@@ -1,12 +1,13 @@
 import json
 import tempfile
+from datetime import datetime, timedelta, timezone
 import unittest
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows, sha256_path, verify_replay_manifest
+from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows, run, sha256_path, verify_replay_manifest
 from replay_suricata import count_eve_events
 
 
@@ -138,6 +139,63 @@ class ResearchPipelineTests(unittest.TestCase):
             eve.write_text('{"event_type":"flow"}\\n', encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "EVE JSON hash"):
                 verify_replay_manifest(manifest, pcap, eve)
+
+    def test_end_to_end_synthetic_harness_writes_auditable_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            csv_path = root / "flows.csv"
+            eve_path = root / "eve.json"
+            pcap_path = root / "capture.pcap"
+            manifest_path = root / "suricata_run.json"
+            out_path = root / "results"
+            pcap_path.write_bytes(b"synthetic test pcap bytes")
+            start = datetime(2017, 7, 7, 10, 0, 0, tzinfo=timezone.utc)
+            rows, alerts = [], []
+            for i in range(120):
+                ts = start + timedelta(seconds=i)
+                attack = i % 2
+                rows.append({
+                    "Timestamp": ts.strftime("%m/%d/%Y %H:%M:%S"),
+                    "Source IP": "10.0.0." + str(i + 1), "Source Port": 10000 + i,
+                    "Destination IP": "192.0.2.1", "Destination Port": 443,
+                    "Protocol": 6, "Flow Duration": 1_000_000,
+                    "Total Fwd Packets": 8 if attack else 2,
+                    "Total Backward Packets": 1 if attack else 4,
+                    "Total Length of Fwd Packets": 900 if attack else 120,
+                    "Total Length of Bwd Packets": 40 if attack else 600,
+                    "SYN Flag Count": 1 if attack else 0,
+                    "Flow IAT Mean": 50_000 if attack else 500_000,
+                    "Label": "ATTACK" if attack else "BENIGN",
+                })
+                if i % 4 == 0:
+                    alerts.append(json.dumps({
+                        "event_type": "alert",
+                        "timestamp": (ts + timedelta(milliseconds=100)).isoformat(),
+                        "src_ip": "10.0.0." + str(i + 1), "src_port": 10000 + i,
+                        "dest_ip": "192.0.2.1", "dest_port": 443, "proto": "TCP",
+                        "alert": {"severity": 2},
+                    }))
+            pd.DataFrame(rows).to_csv(csv_path, index=False)
+            eve_path.write_text("\n".join(alerts) + "\n", encoding="utf-8")
+            manifest_path.write_text(json.dumps({
+                "inputs": {"pcap": {"sha256": sha256_path(pcap_path)}},
+                "eve_json": {"sha256": sha256_path(eve_path)},
+                "suricata_version": "synthetic fixture - not a Suricata result",
+            }), encoding="utf-8")
+
+            report = run(csv_path, eve_path, pcap_path, manifest_path, out_path,
+                         budget=2, window_seconds=15, alpha=.10, tolerance=2.0)
+            self.assertEqual(report["split_rows"], {"train": 72, "calibration": 24, "test": 24})
+            self.assertEqual(report["suricata_alignment"]["matched_alert_events"], len(alerts))
+            self.assertIn("empirical_coverage", report["conformal_diagnostics"])
+            self.assertTrue((out_path / "test_flows.csv").is_file())
+            self.assertTrue((out_path / "report.json").is_file())
+            self.assertTrue((out_path / "run_metadata.json").is_file())
+            selected = pd.read_csv(out_path / "test_flows.csv")
+            selected["window"] = (
+                pd.to_datetime(selected["timestamp"], utc=True).map(lambda x: x.timestamp()) // 15
+            ).astype(int)
+            self.assertLessEqual(int(selected.groupby("window")["selected_hybrid"].sum().max()), 2)
 
     def test_eve_counts_invalid_lines(self):
         with tempfile.TemporaryDirectory() as directory:
