@@ -215,7 +215,8 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
             )
             matched += 1
     return {"alert_events": total, "matched_alert_events": matched,
-            "unmatched_alert_events": total - matched,
+            "ambiguous_alert_events": ambiguous,
+            "unmatched_alert_events": total - matched - ambiguous,
             "unmatched_reasons": dict(unmatched_reasons),
             "match_rate": matched / total if total else None,
             "tolerance_seconds": tolerance_seconds}
