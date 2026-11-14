@@ -47,7 +47,7 @@ Check that `results/suricata/eve.json` exists and contains `event_type: alert` e
 
 ## Run Suricata replay
 
-Keep EVE alert and flow output enabled in your Suricata config. The wrapper runs offline replay, counts EVE event types, and saves a run manifest with input hashes and the Suricata version:
+Keep EVE alert output enabled in your Suricata config. The pipeline consumes alert events only; for large PCAPs, limiting EVE to alerts reduces disk use. The Colab notebook creates and hashes a derived alert-only config. The wrapper runs offline replay, counts EVE event types, and saves a run manifest with input hashes and the Suricata version:
 
     python research/replay_suricata.py --pcap /path/to/capture.pcap --config /path/to/suricata.yaml --out results/suricata --ruleset /path/to/rules
 
