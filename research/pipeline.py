@@ -87,8 +87,17 @@ def load_flows(csv_path, flow_timezone="UTC"):
 
     out = pd.DataFrame(index=df.index)
     # CIC-IDS2017 flow timestamps use day/month/year (e.g., 5/7/2017 is 5 July).
-    parsed_timestamps = pd.to_datetime(df[cols["timestamp"]], errors="coerce", dayfirst=True)
+    raw_timestamps = df[cols["timestamp"]].astype("string").str.strip()
+    parsed_timestamps = pd.to_datetime(raw_timestamps, errors="coerce", dayfirst=True)
+    implicit_pm_adjusted_rows = 0
     if not isinstance(parsed_timestamps.dtype, pd.DatetimeTZDtype):
+        # The published CIC-IDS2017 CSV omits AM/PM; 1-7 represent afternoon hours.
+        has_meridiem = raw_timestamps.str.contains(r"\\b(?:AM|PM)\\b", case=False, na=False)
+        implicit_pm = parsed_timestamps.dt.hour.between(1, 7) & ~has_meridiem
+        implicit_pm_adjusted_rows = int(implicit_pm.sum())
+        parsed_timestamps = parsed_timestamps + pd.to_timedelta(
+            implicit_pm.astype("int8") * 12, unit="h"
+        )
         parsed_timestamps = parsed_timestamps.dt.tz_localize(
             flow_timezone, ambiguous="NaT", nonexistent="NaT"
         )
@@ -126,6 +135,7 @@ def load_flows(csv_path, flow_timezone="UTC"):
     input_rows = len(out)
     audit = {
         "input_rows": int(input_rows),
+        "implicit_pm_adjusted_rows": implicit_pm_adjusted_rows,
         "retained_rows": int(valid.sum()),
         "dropped_rows": int((~valid).sum()),
         "invalid_timestamp_rows": int(out["timestamp"].isna().sum()),
