@@ -306,6 +306,7 @@ def verify_replay_manifest(manifest_path, pcap_path, eve_path):
 def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, window_seconds, alpha, tolerance, ruleset_path=None):
     replay_manifest = verify_replay_manifest(replay_manifest_path, pcap_path, eve_path)
     flows = load_flows(csv_path)
+    ingestion_audit = flows.attrs.get("ingestion_audit", {})
     alignment = attach_suricata_alerts(flows, eve_path, tolerance)
     flows = flows.sort_values("timestamp").reset_index(drop=True)
     # Strict chronological split; thresholds and model never see test labels.
@@ -379,7 +380,7 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
         item["conformal_mean_set_size"] = float(set_sizes[positions].mean()) if len(positions) else None
 
     report = {
-        "dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,
+        "dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,\n        "ingestion_audit": ingestion_audit,
         "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
         "alert_budget_per_window": budget, "window_seconds": window_seconds,
         "conformal_alpha": alpha, "suricata_alignment": alignment,
