@@ -232,7 +232,8 @@ class ResearchPipelineTests(unittest.TestCase):
             }), encoding="utf-8")
 
             report = run(csv_path, eve_path, pcap_path, manifest_path, out_path,
-                         budget=2, window_seconds=15, alpha=.10, tolerance=2.0)
+                         budget=2, window_seconds=15, alpha=.10, tolerance=2.0,
+                         dataset_source="synthetic fixture", dataset_revision="fixture-v1")
             self.assertEqual(report["split_rows"], {"train": 72, "calibration": 24, "test": 24})
             self.assertEqual(report["suricata_alignment"]["matched_alert_events"], len(alerts))
             self.assertIn("empirical_coverage", report["conformal_diagnostics"])
@@ -242,6 +243,8 @@ class ResearchPipelineTests(unittest.TestCase):
             self.assertTrue((out_path / "artifact_manifest.json").is_file())
             metadata = json.loads((out_path / "run_metadata.json").read_text(encoding="utf-8"))
             self.assertRegex(metadata["software"]["project_git_commit"], r"^[0-9a-f]{40}$")
+            self.assertEqual(metadata["dataset_provenance"],
+                             {"source": "synthetic fixture", "revision": "fixture-v1"})
             self.assertEqual(
                 verify_artifact_manifest(out_path / "artifact_manifest.json")["count"], 3
             )
