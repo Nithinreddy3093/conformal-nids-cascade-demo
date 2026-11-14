@@ -76,7 +76,7 @@ def normalize_ip(value):
         return None
 
 
-def load_flows(csv_path):
+def load_flows(csv_path, flow_timezone="UTC"):
     df = pd.read_csv(csv_path, low_memory=False)
     df.columns = [str(c).strip() for c in df.columns]
     cols = {name: pick_column(df.columns, aliases, name not in {"src_ip", "src_port", "dst_ip", "dst_port"})
@@ -86,7 +86,12 @@ def load_flows(csv_path):
             raise ValueError(f"{name} is required for Suricata alignment; use the original labeled-flow CSV.")
 
     out = pd.DataFrame(index=df.index)
-    out["timestamp"] = pd.to_datetime(df[cols["timestamp"]], errors="coerce", utc=True, dayfirst=False)
+    parsed_timestamps = pd.to_datetime(df[cols["timestamp"]], errors="coerce", dayfirst=False)
+    if not isinstance(parsed_timestamps.dtype, pd.DatetimeTZDtype):
+        parsed_timestamps = parsed_timestamps.dt.tz_localize(
+            flow_timezone, ambiguous="NaT", nonexistent="NaT"
+        )
+    out["timestamp"] = parsed_timestamps.dt.tz_convert("UTC")
     out["src_ip"] = df[cols["src_ip"]].map(normalize_ip)
     out["dst_ip"] = df[cols["dst_ip"]].map(normalize_ip)
     out["src_port"] = pd.to_numeric(df[cols["src_port"]], errors="coerce")
@@ -304,9 +309,9 @@ def verify_replay_manifest(manifest_path, pcap_path, eve_path):
     return manifest
 
 
-def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, window_seconds, alpha, tolerance, ruleset_path=None):
+def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, window_seconds, alpha, tolerance, ruleset_path=None, flow_timezone="UTC"):
     replay_manifest = verify_replay_manifest(replay_manifest_path, pcap_path, eve_path)
-    flows = load_flows(csv_path)
+    flows = load_flows(csv_path, flow_timezone=flow_timezone)
     ingestion_audit = flows.attrs.get("ingestion_audit", {})
     alignment = attach_suricata_alerts(flows, eve_path, tolerance)
     flows = flows.sort_values("timestamp").reset_index(drop=True)
@@ -408,7 +413,7 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
         "model": {"type": "RandomForestClassifier", "n_estimators": 300,
                   "min_samples_leaf": 2, "class_weight": "balanced", "random_state": 17},
         "parameters": {"budget": budget, "window_seconds": window_seconds,
-                       "alpha": alpha, "alignment_tolerance_seconds": tolerance},
+                       "alpha": alpha, "alignment_tolerance_seconds": tolerance,\n                       "flow_timezone": flow_timezone},
         "notes": ["EVE JSON and labeled flows must correspond to the same PCAP interval.",
                   "Record the source PCAP and ruleset hashes in the experiment log."],
     }
@@ -427,11 +432,11 @@ def main():
     parser.add_argument("--budget", type=int, default=5, help="maximum alerts per time window")
     parser.add_argument("--window-seconds", type=int, default=900)
     parser.add_argument("--alpha", type=float, default=0.10)
-    parser.add_argument("--alignment-tolerance", type=float, default=2.0)
+    parser.add_argument("--alignment-tolerance", type=float, default=2.0)\n    parser.add_argument("--flow-timezone", required=True,\n                        help="Timezone of timezone-naive flow CSV timestamps (for example UTC or America/Toronto)")
     args = parser.parse_args()
     report = run(args.flows_csv, args.eve_json, args.pcap, args.replay_manifest,
                  args.out, args.budget, args.window_seconds, args.alpha,
-                 args.alignment_tolerance, args.ruleset)
+                 args.alignment_tolerance, args.ruleset, args.flow_timezone)
     print(json.dumps(report, indent=2))
 
 
