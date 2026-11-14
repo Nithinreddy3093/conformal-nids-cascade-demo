@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows
+from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows, sha256_path, verify_replay_manifest
 from replay_suricata import count_eve_events
 
 
@@ -86,6 +86,24 @@ class ResearchPipelineTests(unittest.TestCase):
         })
         priorities = hybrid_priority(frame)
         self.assertGreater(priorities[0], priorities[1])
+
+    def test_replay_manifest_rejects_mismatched_eve(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pcap, eve, manifest = root / "capture.pcap", root / "eve.json", root / "suricata_run.json"
+            pcap.write_bytes(b"pcap bytes")
+            eve.write_text('{"event_type":"alert"}\\n', encoding="utf-8")
+            record = {
+                "inputs": {"pcap": {"sha256": sha256_path(pcap)}},
+                "eve_json": {"sha256": sha256_path(eve)},
+                "suricata_version": "Suricata 8.0.4",
+            }
+            manifest.write_text(json.dumps(record), encoding="utf-8")
+            self.assertEqual(verify_replay_manifest(manifest, pcap, eve)["suricata_version"],
+                             "Suricata 8.0.4")
+            eve.write_text('{"event_type":"flow"}\\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "EVE JSON hash"):
+                verify_replay_manifest(manifest, pcap, eve)
 
     def test_eve_counts_invalid_lines(self):
         with tempfile.TemporaryDirectory() as directory:
