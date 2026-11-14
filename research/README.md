@@ -80,7 +80,7 @@ Verify the downloaded outputs before using them:
 
 ```bash
 python research/verify_outputs.py results/first-run/artifact_manifest.json
-``` The analysis step verifies the PCAP and EVE hashes against the replay manifest and fails on a mismatch. Run metadata records SHA-256 hashes, software versions, model settings, and parameters. The report includes ingestion drop counts, alert match/ambiguous/unmatched counts, pooled and per-window policy metrics, and empirical conformal coverage/set-size diagnostics.
+``` The analysis step verifies the PCAP and EVE hashes against the replay manifest and fails on a mismatch. Run metadata records SHA-256 hashes, software versions, the checked-out project Git commit, model settings, and parameters. The report includes ingestion drop counts, alert match/ambiguous/unmatched counts, pooled and per-window policy metrics, and empirical conformal coverage/set-size diagnostics.
 
 ## Alignment and evaluation details
 
