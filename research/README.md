@@ -22,6 +22,14 @@ suricata -r /path/to/selected.pcap -c /etc/suricata/suricata.yaml -l results/sur
 
 Check that `results/suricata/eve.json` exists and contains `event_type: alert` events before continuing. Use only the labeled-flow CSV that corresponds to that same capture interval.
 
+## Run Suricata replay
+
+Keep EVE alert and flow output enabled in your Suricata config. The wrapper runs offline replay, counts EVE event types, and saves a run manifest with input hashes and the Suricata version:
+
+    python research/replay_suricata.py --pcap /path/to/capture.pcap --config /path/to/suricata.yaml --out results/suricata --ruleset /path/to/rules
+
+It does not install Suricata or change the config. Check the generated eve.json before running the classifier pipeline.
+
 ## Run the real-data experiment
 
 ```bash
