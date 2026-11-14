@@ -46,7 +46,7 @@ python research/pipeline.py \
   --ruleset /path/to/suricata/rules
 ```
 
-Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The metadata records SHA-256 hashes for the CSV, EVE log, source PCAP, and optional ruleset; software versions; and run parameters. The report includes pooled and per-window policy metrics and alert-alignment counts.
+Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The analysis step verifies the PCAP and EVE hashes against the replay manifest and fails on a mismatch. Run metadata records SHA-256 hashes, software versions, model settings, and parameters. The report includes pooled and per-window policy metrics and alert-alignment counts.
 
 ## Alignment and evaluation details
 
