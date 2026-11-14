@@ -86,7 +86,8 @@ def load_flows(csv_path, flow_timezone="UTC"):
             raise ValueError(f"{name} is required for Suricata alignment; use the original labeled-flow CSV.")
 
     out = pd.DataFrame(index=df.index)
-    parsed_timestamps = pd.to_datetime(df[cols["timestamp"]], errors="coerce", dayfirst=False)
+    # CIC-IDS2017 flow timestamps use day/month/year (e.g., 5/7/2017 is 5 July).
+    parsed_timestamps = pd.to_datetime(df[cols["timestamp"]], errors="coerce", dayfirst=True)
     if not isinstance(parsed_timestamps.dtype, pd.DatetimeTZDtype):
         parsed_timestamps = parsed_timestamps.dt.tz_localize(
             flow_timezone, ambiguous="NaT", nonexistent="NaT"
