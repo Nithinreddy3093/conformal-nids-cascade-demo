@@ -213,7 +213,7 @@ def suricata_version():
         return "not available in pipeline environment"
 
 
-def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
+def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, tolerance, ruleset_path=None):
     flows = load_flows(csv_path)
     alignment = attach_suricata_alerts(flows, eve_path, tolerance)
     flows = flows.sort_values("timestamp").reset_index(drop=True)
