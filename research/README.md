@@ -74,7 +74,7 @@ python research/pipeline.py \
 ```
 
 
-The CLI requires an explicit `--flow-timezone` for timezone-naive CICFlowMeter timestamps. `UTC` is only an example: establish the source timestamp convention before replay/alignment, then use the corresponding IANA timezone. The selected timezone is recorded in run metadata.
+The CLI requires an explicit `--flow-timezone` for timezone-naive CICFlowMeter timestamps. CIC-IDS2017 flow timestamps are documented as New Brunswick local time (UTC−3 during the July capture), while PCAP timestamps are UTC; use `America/Moncton` for the original flow CSV and verify time ranges and alignment before interpreting results ([TMLR dataset-handling paper, §A.3](https://openreview.net/pdf?id=hDywd5AbIM)). The selected timezone is recorded in run metadata.
 
 Outputs are `report.json`, `test_flows.csv`, `run_metadata.json`, and `artifact_manifest.json`. The artifact manifest hashes each of the first three files.
 
