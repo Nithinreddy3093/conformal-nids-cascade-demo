@@ -36,7 +36,7 @@ python research/pipeline.py \
   --alignment-tolerance 2.0
 ```
 
-Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The metadata records SHA-256 hashes and sizes for the CSV, EVE log, source PCAP, and optional ruleset; software versions; and run parameters. The report includes pooled and per-window policy metrics and alert-alignment counts.
+Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The metadata records SHA-256 hashes for the CSV, EVE log, source PCAP, and optional ruleset; software versions; and run parameters. The report includes pooled and per-window policy metrics and alert-alignment counts.
 
 ## Alignment and evaluation details
 
