@@ -146,6 +146,14 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
                 unmatched_reasons["time_not_overlapping"] += 1
                 continue
             flows.loc[hits, "signature_hit"] = True
+            severity = (event.get("alert") or {}).get("severity", 3)
+            try:
+                signature_score = max(0.0, 4.0 - float(severity))
+            except (TypeError, ValueError):
+                signature_score = 1.0
+            flows.loc[hits, "signature_score"] = np.maximum(
+                flows.loc[hits, "signature_score"].to_numpy(), signature_score
+            )
             matched += 1
     return {"alert_events": total, "matched_alert_events": matched,
             "unmatched_alert_events": total - matched,
