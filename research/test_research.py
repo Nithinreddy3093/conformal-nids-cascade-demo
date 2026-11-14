@@ -24,6 +24,19 @@ class ResearchPipelineTests(unittest.TestCase):
         result = conformal_sets(cal_probs, cal_y, test_probs, np.array([0, 1]), alpha=.4)
         self.assertEqual(result, [[0]])
 
+    def test_timezone_naive_flow_timestamp_uses_declared_timezone(self):
+        row = {
+            "Timestamp": ["7/7/2017 10:00:00 AM"], "Source IP": ["10.0.0.1"],
+            "Source Port": [1234], "Destination IP": ["192.0.2.4"],
+            "Destination Port": [443], "Protocol": [6], "Flow Duration": [1_000_000],
+            "Label": ["BENIGN"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "flows.csv"
+            pd.DataFrame(row).to_csv(csv_path, index=False)
+            flows = load_flows(csv_path, flow_timezone="America/Los_Angeles")
+            self.assertEqual(flows.iloc[0].timestamp.isoformat(), "2017-07-07T17:00:00+00:00")
+
     def test_labeled_csv_conversion_and_alert_alignment(self):
         columns = {
             "Timestamp": ["7/7/2017 10:00:00 AM"],
