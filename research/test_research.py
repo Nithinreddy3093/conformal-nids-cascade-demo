@@ -53,6 +53,31 @@ class ResearchPipelineTests(unittest.TestCase):
             self.assertTrue(bool(flows.iloc[0].signature_hit))
             self.assertEqual(float(flows.iloc[0].signature_score), 2.0)
 
+    def test_reused_tuple_alert_matches_only_time_overlapping_flow(self):
+        rows = {
+            "Timestamp": ["7/7/2017 10:00:00 AM", "7/7/2017 11:00:00 AM"],
+            "Source IP": ["10.0.0.1", "10.0.0.1"], "Source Port": [51515, 51515],
+            "Destination IP": ["192.0.2.4", "192.0.2.4"],
+            "Destination Port": [443, 443], "Protocol": [6, 6],
+            "Flow Duration": [2_000_000, 2_000_000], "Total Fwd Packets": [4, 4],
+            "Total Backward Packets": [3, 3], "Total Length of Fwd Packets": [1200, 1200],
+            "Total Length of Bwd Packets": [700, 700], "SYN Flag Count": [1, 1],
+            "Flow IAT Mean": [250_000, 250_000], "Label": ["BENIGN", "BENIGN"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            csv_path, eve_path = root / "flows.csv", root / "eve.json"
+            pd.DataFrame(rows).to_csv(csv_path, index=False)
+            flows = load_flows(csv_path)
+            event = {
+                "event_type": "alert", "timestamp": "2017-07-07T11:00:01.000000+0000",
+                "src_ip": "192.0.2.4", "src_port": 443, "dest_ip": "10.0.0.1",
+                "dest_port": 51515, "proto": "TCP", "alert": {"severity": 1},
+            }
+            eve_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+            attach_suricata_alerts(flows, eve_path, tolerance_seconds=0)
+            self.assertEqual(flows.signature_hit.tolist(), [False, True])
+
     def test_hybrid_gives_signature_hits_priority_over_ml_only(self):
         frame = pd.DataFrame({
             "signature_hit": [True, False],
