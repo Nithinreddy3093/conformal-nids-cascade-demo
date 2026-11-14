@@ -99,6 +99,14 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
     for vals in index.values():
         vals.sort()
     starts = {k: [v[0] for v in vals] for k, vals in index.items()}
+    prefix_max_end = {}
+    for key, vals in index.items():
+        running = float("-inf")
+        maxima = []
+        for _, end, _ in vals:
+            running = max(running, end)
+            maxima.append(running)
+        prefix_max_end[key] = maxima
     total, matched = 0, 0
     unmatched_reasons = defaultdict(int)
     with open(eve_path, encoding="utf-8") as stream:
