@@ -115,7 +115,7 @@ class ResearchPipelineTests(unittest.TestCase):
                 "src_ip": "192.0.2.4", "src_port": 443, "dest_ip": "10.0.0.1",
                 "dest_port": 51515, "proto": "TCP", "alert": {"severity": 1},
             }
-            eve_path.write_text(json.dumps(event) + "\\n", encoding="utf-8")
+            eve_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
             alignment = attach_suricata_alerts(flows, eve_path, tolerance_seconds=0)
             self.assertEqual(alignment["ambiguous_alert_events"], 1)
             self.assertEqual(alignment["matched_alert_events"], 0)
