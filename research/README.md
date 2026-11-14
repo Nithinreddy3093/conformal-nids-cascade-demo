@@ -59,7 +59,8 @@ Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The analys
 
 - Flow identity uses a direction-independent 5-tuple: endpoint addresses, ports, and protocol.
 - An EVE alert is assigned only when its timestamp falls within the CIC flow start/end interval plus the declared tolerance.
-- Alerts that overlap multiple rows are counted as ambiguous and not assigned. Unmatched alerts are counted by reason in `report.json`; neither case is silently attached to a flow.
+- Alerts outside the selected CSV's overall flow-time span (with the configured tolerance) are counted separately as out-of-scope; they are not included in the in-scope alignment match-rate denominator. This supports replaying a full-day PCAP for a CSV covering only one segment.
+- Alerts that overlap multiple rows are counted as ambiguous and not assigned. Unmatched in-scope alerts are counted by reason in `report.json`; neither case is silently attached to a flow.
 - Rows are sorted by timestamp and split 60%/20%/20% into training, calibration, and test slices.
 - Calibration thresholds are learned from the middle slice; test labels are used only for evaluation.
 - The three policies are ML probability top-K, signature-only top-K, and signature-first plus conformal candidate triage. Each has a per-window cap.
