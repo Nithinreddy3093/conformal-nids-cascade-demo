@@ -84,7 +84,7 @@ def load_flows(csv_path):
         canonical_key(a, b, c, d, p)
         for a, b, c, d, p in zip(out.src_ip, out.src_port, out.dst_ip, out.dst_port, out.protocol)
     ]
-    out["signature_hit"] = False
+    out["signature_hit"] = False\n    out["signature_score"] = 0.0
     return out.reset_index(drop=True)
 
 
@@ -208,9 +208,9 @@ def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
     budget = max(1, int(budget))
     ml_ids = select_topk(test, budget, "p_attack")
     sig_candidates = test[test.signature_hit]
-    sig_ids = select_topk(sig_candidates, budget, "p_attack") if len(sig_candidates) else set()
+    sig_ids = select_topk(sig_candidates, budget, "signature_score") if len(sig_candidates) else set()
     candidates = test[test.signature_hit | test.pred_set.map(lambda s: 1 in s or len(s) == 0)].copy()
-    candidates["priority"] = candidates.signature_hit.astype(int) * 2 + candidates.p_attack
+    candidates["priority"] = candidates.signature_score + candidates.p_attack
     hybrid_ids = select_topk(candidates, budget, "priority")
     attacks = int(test.y.sum())
     metrics = {
