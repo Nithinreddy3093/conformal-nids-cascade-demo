@@ -413,7 +413,8 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
         "model": {"type": "RandomForestClassifier", "n_estimators": 300,
                   "min_samples_leaf": 2, "class_weight": "balanced", "random_state": 17},
         "parameters": {"budget": budget, "window_seconds": window_seconds,
-                       "alpha": alpha, "alignment_tolerance_seconds": tolerance,\n                       "flow_timezone": flow_timezone},
+                       "alpha": alpha, "alignment_tolerance_seconds": tolerance,
+                       "flow_timezone": flow_timezone},
         "notes": ["EVE JSON and labeled flows must correspond to the same PCAP interval.",
                   "Record the source PCAP and ruleset hashes in the experiment log."],
     }
@@ -432,7 +433,9 @@ def main():
     parser.add_argument("--budget", type=int, default=5, help="maximum alerts per time window")
     parser.add_argument("--window-seconds", type=int, default=900)
     parser.add_argument("--alpha", type=float, default=0.10)
-    parser.add_argument("--alignment-tolerance", type=float, default=2.0)\n    parser.add_argument("--flow-timezone", required=True,\n                        help="Timezone of timezone-naive flow CSV timestamps (for example UTC or America/Toronto)")
+    parser.add_argument("--alignment-tolerance", type=float, default=2.0)
+    parser.add_argument("--flow-timezone", required=True,
+                        help="Timezone of timezone-naive flow CSV timestamps (for example UTC or America/Toronto)")
     args = parser.parse_args()
     report = run(args.flows_csv, args.eve_json, args.pcap, args.replay_manifest,
                  args.out, args.budget, args.window_seconds, args.alpha,
