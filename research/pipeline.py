@@ -416,7 +416,9 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
         item["conformal_mean_set_size"] = float(set_sizes[positions].mean()) if len(positions) else None
 
     report = {
-        "dataset": "CIC-IDS2017 labeled flow CSV",\n        "dataset_provenance": {"source": dataset_source, "revision": dataset_revision},\n        "rows": n,
+        "dataset": "CIC-IDS2017 labeled flow CSV",
+        "dataset_provenance": {"source": dataset_source, "revision": dataset_revision},
+        "rows": n,
         "ingestion_audit": ingestion_audit,
         "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
         "alert_budget_per_window": budget, "window_seconds": window_seconds,
@@ -499,12 +501,15 @@ def main():
     parser.add_argument("--window-seconds", type=int, default=900)
     parser.add_argument("--alpha", type=float, default=0.10)
     parser.add_argument("--alignment-tolerance", type=float, default=2.0)
-    parser.add_argument("--dataset-source", help="Dataset source URL or repository identifier")\n    parser.add_argument("--dataset-revision", help="Pinned dataset revision or release identifier")\n    parser.add_argument("--flow-timezone", required=True,
+    parser.add_argument("--dataset-source", help="Dataset source URL or repository identifier")
+    parser.add_argument("--dataset-revision", help="Pinned dataset revision or release identifier")
+    parser.add_argument("--flow-timezone", required=True,
                         help="Timezone of timezone-naive flow CSV timestamps (for example UTC or America/Toronto)")
     args = parser.parse_args()
     report = run(args.flows_csv, args.eve_json, args.pcap, args.replay_manifest,
                  args.out, args.budget, args.window_seconds, args.alpha,
-                 args.alignment_tolerance, args.ruleset, args.flow_timezone,\n                 args.dataset_source, args.dataset_revision)
+                 args.alignment_tolerance, args.ruleset, args.flow_timezone,
+                 args.dataset_source, args.dataset_revision)
     print(json.dumps(report, indent=2))
 
 
