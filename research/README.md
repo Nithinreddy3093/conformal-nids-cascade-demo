@@ -46,7 +46,7 @@ python research/pipeline.py \
   --window-seconds 900 \
   --alpha 0.10 \
   --alignment-tolerance 2.0 \
-  --flow-timezone UTC \\
+  --flow-timezone UTC \
   --ruleset /path/to/suricata/rules
 ```
 
