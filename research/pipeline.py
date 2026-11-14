@@ -310,7 +310,8 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
         "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
         "alert_budget_per_window": budget, "window_seconds": window_seconds,
         "conformal_alpha": alpha, "suricata_alignment": alignment,
-        "metrics": metrics, "conformal_diagnostics": conformal_diagnostics,\n        "per_window_metrics": per_window,
+        "metrics": metrics, "conformal_diagnostics": conformal_diagnostics,
+        "per_window_metrics": per_window,
     }
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     metadata = {
@@ -327,6 +328,8 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
             "pandas": pd.__version__, "scikit_learn": __import__("sklearn").__version__,
             "suricata": suricata_version(),
         },
+        "model": {"type": "RandomForestClassifier", "n_estimators": 300,
+                  "min_samples_leaf": 2, "class_weight": "balanced", "random_state": 17},
         "parameters": {"budget": budget, "window_seconds": window_seconds,
                        "alpha": alpha, "alignment_tolerance_seconds": tolerance},
         "notes": ["EVE JSON and labeled flows must correspond to the same PCAP interval.",
