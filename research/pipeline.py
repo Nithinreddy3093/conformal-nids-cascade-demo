@@ -153,10 +153,7 @@ def load_flows(csv_path, flow_timezone="UTC"):
 
 
 def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
-    """Match EVE alerts to flow rows using bidirectional 5-tuple and time overlap.
-
-    Returns an audit summary; unmatched alerts are never silently assigned.
-    """
+    """Align EVE alerts to flow rows and separate alerts outside the CSV time span."""
     index = defaultdict(list)
     for i, row in flows.iterrows():
         index[row.flow_key].append((row.start_epoch, row.end_epoch, i))
@@ -171,7 +168,14 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
             running = max(running, end)
             maxima.append(running)
         prefix_max_end[key] = maxima
-    total, matched, ambiguous = 0, 0, 0
+
+    if len(flows):
+        scope_start = float(flows.start_epoch.min()) - tolerance_seconds
+        scope_end = float(flows.end_epoch.max()) + tolerance_seconds
+    else:
+        scope_start, scope_end = float("-inf"), float("inf")
+
+    total, in_scope, out_of_scope, matched, ambiguous = 0, 0, 0, 0, 0
     unmatched_reasons = defaultdict(int)
     with open(eve_path, encoding="utf-8") as stream:
         for line_no, line in enumerate(stream, 1):
@@ -187,16 +191,21 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
             if any(k not in event for k in required):
                 unmatched_reasons["missing_tuple_or_time"] += 1
                 continue
-            key = canonical_key(event["src_ip"], event["src_port"], event["dest_ip"],
-                                event["dest_port"], event["proto"])
-            if key not in index:
-                unmatched_reasons["tuple_not_found"] += 1
-                continue
             ts = pd.to_datetime(event["timestamp"], utc=True, errors="coerce")
             if pd.isna(ts):
                 unmatched_reasons["invalid_timestamp"] += 1
                 continue
             t = ts.timestamp()
+            if t < scope_start or t > scope_end:
+                out_of_scope += 1
+                unmatched_reasons["outside_flow_time_range"] += 1
+                continue
+            in_scope += 1
+            key = canonical_key(event["src_ip"], event["src_port"], event["dest_ip"],
+                                event["dest_port"], event["proto"])
+            if key not in index:
+                unmatched_reasons["tuple_not_found"] += 1
+                continue
             candidates = index[key]
             pos = bisect.bisect_right(starts[key], t + tolerance_seconds)
             first = bisect.bisect_left(prefix_max_end[key], t - tolerance_seconds, 0, pos)
@@ -219,13 +228,21 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
                 flows.loc[hits, "signature_score"].to_numpy(), signature_score
             )
             matched += 1
-    return {"alert_events": total, "matched_alert_events": matched,
-            "ambiguous_alert_events": ambiguous,
-            "unmatched_alert_events": total - matched - ambiguous,
-            "unmatched_reasons": dict(unmatched_reasons),
-            "match_rate": matched / total if total else None,
-            "tolerance_seconds": tolerance_seconds}
-
+    unmatched_in_scope = in_scope - matched - ambiguous
+    return {
+        "alert_events": total,
+        "in_scope_alert_events": in_scope,
+        "out_of_scope_alert_events": out_of_scope,
+        "matched_alert_events": matched,
+        "ambiguous_alert_events": ambiguous,
+        "unmatched_in_scope_alert_events": unmatched_in_scope,
+        "unmatched_alert_events": total - matched - ambiguous,
+        "unmatched_reasons": dict(unmatched_reasons),
+        "match_rate": matched / in_scope if in_scope else None,
+        "flow_scope_start_epoch": scope_start if len(flows) else None,
+        "flow_scope_end_epoch": scope_end if len(flows) else None,
+        "tolerance_seconds": tolerance_seconds,
+    }
 
 def conformal_sets(cal_probs, cal_y, test_probs, classes, alpha):
     """Class-conditional split-conformal sets; class-indexed and finite-sample smoothed."""
