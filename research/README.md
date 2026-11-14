@@ -13,6 +13,25 @@ Dataset files are not included in this repository. Download them from the [offic
 
 **Important: use the original `GeneratedLabelledFlows` CSV, not `MachineLearningCSV`.** The pipeline needs `Timestamp`, source/destination IPs and ports, `Protocol`, CICFlowMeter features, and `Label` on each flow row. The ML-only CSV omits flow identifiers and timestamps, so it cannot be aligned to Suricata alerts. Select the CSV and PCAP from the same capture, and record both file hashes.
 
+
+### Optional pinned mirror (unofficial)
+
+If the official download form is unavailable, the [bencorn Hugging Face mirror](https://huggingface.co/datasets/bencorn/CICIDS2017) lists both `GeneratedLabelledFlows.zip` and daily PCAPs. Its maintainer identifies it as an unofficial copy, so cite CIC/UNB as the dataset publisher and record the mirror revision and hashes. The commands below pin revision `c5637a4d7582337ef60cfb20b77227fbfe687ed6` and download the Wednesday PCAP plus the labeled-flow archive:
+
+```bash
+mkdir -p data/cicids2017
+curl -L --fail -o data/cicids2017/GeneratedLabelledFlows.zip https://huggingface.co/datasets/bencorn/CICIDS2017/resolve/c5637a4d7582337ef60cfb20b77227fbfe687ed6/csvs/GeneratedLabelledFlows.zip
+curl -L --fail -o data/cicids2017/Wednesday-workingHours.pcap https://huggingface.co/datasets/bencorn/CICIDS2017/resolve/c5637a4d7582337ef60cfb20b77227fbfe687ed6/pcaps/Wednesday-workingHours.pcap
+sha256sum data/cicids2017/GeneratedLabelledFlows.zip data/cicids2017/Wednesday-workingHours.pcap
+```
+
+Expected SHA-256 values for that mirror revision:
+
+- `GeneratedLabelledFlows.zip`: `7bdbef286f8893f31c6db12105fa097fa5c2dcc6733179037a08129d150ea27a`
+- `Wednesday-workingHours.pcap`: `cd2674db7559a53f24bc03be3239b315700174ccaef72d10f5edc4c1a08f6186`
+
+These hashes verify file integrity against the pinned mirror objects; they do not independently establish publisher authenticity. Extract the archive and use `Wednesday-workingHours.pcap_ISCX.csv` with this PCAP. The flow archive is about 284 MB and the Wednesday capture about 13.4 GB.
+
 ## Replay one PCAP with Suricata
 
 Record the Suricata version and ruleset before each run. On Linux/WSL, replay the selected PCAP offline:
