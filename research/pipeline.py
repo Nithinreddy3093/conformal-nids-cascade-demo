@@ -429,6 +429,7 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     metadata = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
+        "dataset_provenance": {"source": dataset_source, "revision": dataset_revision},
         "inputs": {
             "labeled_flows_csv": {"path": str(csv_path), "sha256": sha256_path(csv_path)},
             "suricata_eve_json": {"path": str(eve_path), "sha256": sha256_path(eve_path)},
