@@ -112,7 +112,7 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
             running = max(running, end)
             maxima.append(running)
         prefix_max_end[key] = maxima
-    total, matched = 0, 0
+    total, matched, ambiguous = 0, 0, 0
     unmatched_reasons = defaultdict(int)
     with open(eve_path, encoding="utf-8") as stream:
         for line_no, line in enumerate(stream, 1):
@@ -145,6 +145,10 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
                     if end + tolerance_seconds >= t]
             if not hits:
                 unmatched_reasons["time_not_overlapping"] += 1
+                continue
+            if len(hits) > 1:
+                ambiguous += 1
+                unmatched_reasons["ambiguous_multiple_flow_rows"] += 1
                 continue
             flows.loc[hits, "signature_hit"] = True
             severity = (event.get("alert") or {}).get("severity", 3)
