@@ -1,5 +1,7 @@
 # Real-data CIC-IDS2017 pipeline
 
+For the guided data download and Colab run, open [CICIDS2017_Colab.ipynb](CICIDS2017_Colab.ipynb).
+
 This branch adds the first real-data evaluation path to the synthetic web demo. It ingests one CICFlowMeter labeled-flow CSV, reads Suricata EVE JSON from the corresponding PCAP replay, aligns signature alert events with flows, trains an ML model on earlier flows, calibrates class-conditional conformal sets on the next chronological slice, and evaluates three policies under the same per-window alert cap.
 
 ## What is required
