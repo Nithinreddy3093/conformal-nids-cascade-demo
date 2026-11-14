@@ -38,6 +38,7 @@ python research/pipeline.py \
   --flows-csv /path/to/selected_labeled_flows.csv \
   --eve-json results/suricata/eve.json \
   --pcap /path/to/selected.pcap \
+  --replay-manifest results/suricata/suricata_run.json \
   --out results/first-run \
   --budget 5 \
   --window-seconds 900 \
