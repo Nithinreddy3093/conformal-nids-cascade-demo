@@ -380,7 +380,8 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
         item["conformal_mean_set_size"] = float(set_sizes[positions].mean()) if len(positions) else None
 
     report = {
-        "dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,\n        "ingestion_audit": ingestion_audit,
+        "dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,
+        "ingestion_audit": ingestion_audit,
         "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
         "alert_budget_per_window": budget, "window_seconds": window_seconds,
         "conformal_alpha": alpha, "suricata_alignment": alignment,
