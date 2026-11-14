@@ -54,6 +54,22 @@ class ResearchPipelineTests(unittest.TestCase):
             flows = load_flows(csv_path, flow_timezone="America/Moncton")
             self.assertEqual(flows.iloc[0].timestamp.isoformat(), "2017-07-05T13:00:00+00:00")
 
+    def test_cicids_implicit_pm_timestamp_maps_to_afternoon(self):
+        row = {
+            "Timestamp": ["5/7/2017 01:00"], "Source IP": ["10.0.0.1"],
+            "Source Port": [1234], "Destination IP": ["192.0.2.4"],
+            "Destination Port": [443], "Protocol": [6], "Flow Duration": [1_000_000],
+            "Total Fwd Packets": [1], "Total Backward Packets": [1],
+            "Total Length of Fwd Packets": [50], "Total Length of Bwd Packets": [50],
+            "SYN Flag Count": [0], "Flow IAT Mean": [0], "Label": ["BENIGN"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "flows.csv"
+            pd.DataFrame(row).to_csv(csv_path, index=False)
+            flows = load_flows(csv_path, flow_timezone="America/Moncton")
+            self.assertEqual(flows.iloc[0].timestamp.isoformat(), "2017-07-05T16:00:00+00:00")
+            self.assertEqual(flows.attrs["ingestion_audit"]["implicit_pm_adjusted_rows"], 1)
+
     def test_labeled_csv_conversion_and_alert_alignment(self):
         columns = {
             "Timestamp": ["7/7/2017 10:00:00 AM"],
