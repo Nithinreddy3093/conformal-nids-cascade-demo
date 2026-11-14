@@ -46,8 +46,12 @@ python research/pipeline.py \
   --window-seconds 900 \
   --alpha 0.10 \
   --alignment-tolerance 2.0 \
+  --flow-timezone UTC \\
   --ruleset /path/to/suricata/rules
 ```
+
+
+The CLI requires an explicit `--flow-timezone` for timezone-naive CICFlowMeter timestamps. `UTC` is only an example: establish the source timestamp convention before replay/alignment, then use the corresponding IANA timezone. The selected timezone is recorded in run metadata.
 
 Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The analysis step verifies the PCAP and EVE hashes against the replay manifest and fails on a mismatch. Run metadata records SHA-256 hashes, software versions, model settings, and parameters. The report includes ingestion drop counts, alert match/ambiguous/unmatched counts, pooled and per-window policy metrics, and empirical conformal coverage/set-size diagnostics.
 
