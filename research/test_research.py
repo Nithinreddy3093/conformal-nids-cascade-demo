@@ -49,7 +49,7 @@ class ResearchPipelineTests(unittest.TestCase):
             }
             eve_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
             alignment = attach_suricata_alerts(flows, eve_path, tolerance_seconds=0)
-            self.assertEqual(alignment["matched_alert_events"], 1)
+            self.assertEqual(alignment["matched_alert_events"], 1, msg=repr(alignment))
             self.assertTrue(bool(flows.iloc[0].signature_hit))
             self.assertEqual(float(flows.iloc[0].signature_score), 2.0)
 
