@@ -436,6 +436,17 @@ def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, wi
                   "Record the source PCAP and ruleset hashes in the experiment log."],
     }
     (out / "run_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    output_names = ("report.json", "test_flows.csv", "run_metadata.json")
+    output_manifest = {
+        "schema_version": 1,
+        "outputs": {
+            name: {"sha256": sha256_path(out / name), "bytes": (out / name).stat().st_size}
+            for name in output_names
+        },
+    }
+    (out / "artifact_manifest.json").write_text(
+        json.dumps(output_manifest, indent=2), encoding="utf-8"
+    )
     return report
 
 
