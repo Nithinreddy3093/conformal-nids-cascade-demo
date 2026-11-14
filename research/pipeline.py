@@ -178,6 +178,12 @@ def conformal_sets(cal_probs, cal_y, test_probs, classes, alpha):
     return sets
 
 
+def hybrid_priority(frame):
+    """Keep signature hits ahead of ML-ranked non-signature candidates."""
+    return np.where(frame["signature_hit"], 10.0 + frame["signature_score"],
+                    frame["p_attack"])
+
+
 def select_topk(frame, budget, score):
     chosen = []
     for _, group in frame.groupby("window", sort=True):
@@ -188,9 +194,12 @@ def select_topk(frame, budget, score):
 def score_selection(frame, chosen, total_attacks):
     tp = int(frame.loc[list(chosen), "y"].sum()) if chosen else 0
     n = len(chosen)
-    return {"alerts": n, "true_alerts": tp, "false_alerts": n-tp,
+    fp = n - tp
+    total_benign = int((frame["y"] == 0).sum())
+    return {"alerts": n, "true_alerts": tp, "false_alerts": fp,
             "recall": tp/total_attacks if total_attacks else None,
-            "precision": tp/n if n else None}
+            "precision": tp/n if n else None,
+            "false_positive_rate": fp/total_benign if total_benign else None}
 
 
 def sha256_path(path):
@@ -251,7 +260,7 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
     sig_candidates = test[test.signature_hit]
     sig_ids = select_topk(sig_candidates, budget, "signature_score") if len(sig_candidates) else set()
     candidates = test[test.signature_hit | test.pred_set.map(lambda s: 1 in s or len(s) == 0)].copy()
-    candidates["priority"] = candidates.signature_score + candidates.p_attack
+    candidates["priority"] = hybrid_priority(candidates)
     hybrid_ids = select_topk(candidates, budget, "priority")
     attacks = int(test.y.sum())
     policy_indices = {
