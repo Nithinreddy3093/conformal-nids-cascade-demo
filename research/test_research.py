@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, load_flows
+from pipeline import attach_suricata_alerts, canonical_key, conformal_sets, hybrid_priority, load_flows
 from replay_suricata import count_eve_events
 
 
@@ -52,6 +52,15 @@ class ResearchPipelineTests(unittest.TestCase):
             self.assertEqual(alignment["matched_alert_events"], 1, msg=repr(alignment))
             self.assertTrue(bool(flows.iloc[0].signature_hit))
             self.assertEqual(float(flows.iloc[0].signature_score), 2.0)
+
+    def test_hybrid_gives_signature_hits_priority_over_ml_only(self):
+        frame = pd.DataFrame({
+            "signature_hit": [True, False],
+            "signature_score": [1.0, 0.0],
+            "p_attack": [0.01, 0.99],
+        })
+        priorities = hybrid_priority(frame)
+        self.assertGreater(priorities[0], priorities[1])
 
     def test_eve_counts_invalid_lines(self):
         with tempfile.TemporaryDirectory() as directory:
