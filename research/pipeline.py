@@ -84,7 +84,8 @@ def load_flows(csv_path):
         canonical_key(a, b, c, d, p)
         for a, b, c, d, p in zip(out.src_ip, out.src_port, out.dst_ip, out.dst_port, out.protocol)
     ]
-    out["signature_hit"] = False\n    out["signature_score"] = 0.0
+    out["signature_hit"] = False
+    out["signature_score"] = 0.0
     return out.reset_index(drop=True)
 
 
@@ -180,11 +181,19 @@ def score_selection(frame, chosen, total_attacks):
             "precision": tp/n if n else None}
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
     flows = load_flows(csv_path)
     alignment = attach_suricata_alerts(flows, eve_path, tolerance)
     flows = flows.sort_values("timestamp").reset_index(drop=True)
-    # Strict chronological split; thresholds and model never see the test labels.
+    # Strict chronological split; thresholds and model never see test labels.
     n = len(flows)
     a, b = int(n * .60), int(n * .80)
     train, cal, test = flows.iloc[:a].copy(), flows.iloc[a:b].copy(), flows.iloc[b:].copy()
@@ -213,30 +222,63 @@ def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
     candidates["priority"] = candidates.signature_score + candidates.p_attack
     hybrid_ids = select_topk(candidates, budget, "priority")
     attacks = int(test.y.sum())
-    metrics = {
-        "ML probability top-K": score_selection(test, ml_ids, attacks),
-        "Signature only": score_selection(test, sig_ids, attacks),
-        "Signature + ML + conformal": score_selection(test, hybrid_ids, attacks),
+    policy_indices = {
+        "ML probability top-K": ml_ids,
+        "Signature only": sig_ids,
+        "Signature + ML + conformal": hybrid_ids,
     }
+    metrics = {name: score_selection(test, ids, attacks)
+               for name, ids in policy_indices.items()}
+    per_window = []
+    for window_id, group in test.groupby("window", sort=True):
+        group_ids = set(group.index)
+        window_attacks = int(group.y.sum())
+        per_window.append({
+            "window": int(window_id), "flows": len(group), "attacks": window_attacks,
+            "policies": {name: score_selection(group, ids & group_ids, window_attacks)
+                         for name, ids in policy_indices.items()},
+        })
+
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     test["selected_ml"] = test.index.isin(ml_ids)
     test["selected_signature"] = test.index.isin(sig_ids)
     test["selected_hybrid"] = test.index.isin(hybrid_ids)
-    test["pred_set_names"] = test.pred_set.map(lambda s: "|".join("Attack" if x == 1 else "Benign" for x in s))
+    test["pred_set_names"] = test.pred_set.map(
+        lambda values: "|".join("Attack" if x == 1 else "Benign" for x in values))
     test.drop(columns=["flow_key", "pred_set"]).to_csv(out / "test_flows.csv", index=False)
-    report = {"dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,
-              "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
-              "alert_budget_per_window": budget, "window_seconds": window_seconds,
-              "conformal_alpha": alpha, "suricata_alignment": alignment, "metrics": metrics}
+    report = {
+        "dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,
+        "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
+        "alert_budget_per_window": budget, "window_seconds": window_seconds,
+        "conformal_alpha": alpha, "suricata_alignment": alignment,
+        "metrics": metrics, "per_window_metrics": per_window,
+    }
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    metadata = {
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "inputs": {
+            "labeled_flows_csv": {"path": str(csv_path), "sha256": sha256_file(csv_path)},
+            "suricata_eve_json": {"path": str(eve_path), "sha256": sha256_file(eve_path)},
+        },
+        "software": {
+            "python": platform.python_version(), "numpy": np.__version__,
+            "pandas": pd.__version__, "scikit_learn": __import__("sklearn").__version__,
+            "suricata": suricata_version(),
+        },
+        "parameters": {"budget": budget, "window_seconds": window_seconds,
+                       "alpha": alpha, "alignment_tolerance_seconds": tolerance},
+        "notes": ["EVE JSON and labeled flows must correspond to the same PCAP interval.",
+                  "Record the source PCAP and ruleset hashes in the experiment log."],
+    }
+    (out / "run_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return report
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flows-csv", required=True, help="CICFlowMeter labeled flow CSV")
-    parser.add_argument("--eve-json", required=True, help="Suricata EVE JSON from the matching PCAP")\n    parser.add_argument("--pcap", required=True, help="Source PCAP used to generate both inputs; recorded by SHA-256")\n    parser.add_argument("--ruleset", help="Optional Suricata rules file or directory to hash for provenance")
+    parser.add_argument("--eve-json", required=True, help="Suricata EVE JSON from the matching PCAP")
     parser.add_argument("--out", default="results/run-001")
     parser.add_argument("--budget", type=int, default=5, help="maximum alerts per time window")
     parser.add_argument("--window-seconds", type=int, default=900)
