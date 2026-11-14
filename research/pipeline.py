@@ -8,9 +8,13 @@ from __future__ import annotations
 
 import argparse
 import bisect
+import hashlib
 import json
+import platform
+import subprocess
 from collections import defaultdict
 from pathlib import Path
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -181,12 +185,32 @@ def score_selection(frame, chosen, total_attacks):
             "precision": tp/n if n else None}
 
 
-def sha256_file(path):
+def sha256_path(path):
+    """Hash a file or directory tree without loading it all into memory."""
+    path = Path(path)
     digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    if path.is_file():
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    if path.is_dir():
+        for child in sorted(p for p in path.rglob("*") if p.is_file()):
+            digest.update(child.relative_to(path).as_posix().encode("utf-8"))
+            with child.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        return digest.hexdigest()
+    raise FileNotFoundError(path)
+
+
+def suricata_version():
+    try:
+        result = subprocess.run(["suricata", "-V"], check=False, capture_output=True,
+                                text=True, timeout=10)
+        return (result.stdout or result.stderr).strip() or "unknown"
+    except (OSError, subprocess.TimeoutExpired):
+        return "not available in pipeline environment"
 
 
 def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
@@ -258,8 +282,11 @@ def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
     metadata = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "inputs": {
-            "labeled_flows_csv": {"path": str(csv_path), "sha256": sha256_file(csv_path)},
-            "suricata_eve_json": {"path": str(eve_path), "sha256": sha256_file(eve_path)},
+            "labeled_flows_csv": {"path": str(csv_path), "sha256": sha256_path(csv_path)},
+            "suricata_eve_json": {"path": str(eve_path), "sha256": sha256_path(eve_path)},
+            "source_pcap": {"path": str(pcap_path), "sha256": sha256_path(pcap_path)},
+            **({"suricata_ruleset": {"path": str(ruleset_path), "sha256": sha256_path(ruleset_path)}}
+               if ruleset_path else {}),
         },
         "software": {
             "python": platform.python_version(), "numpy": np.__version__,
@@ -279,14 +306,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flows-csv", required=True, help="CICFlowMeter labeled flow CSV")
     parser.add_argument("--eve-json", required=True, help="Suricata EVE JSON from the matching PCAP")
+    parser.add_argument("--pcap", required=True, help="Source PCAP used for replay; recorded by SHA-256")
+    parser.add_argument("--ruleset", help="Optional Suricata rule file or directory to record by SHA-256")
     parser.add_argument("--out", default="results/run-001")
     parser.add_argument("--budget", type=int, default=5, help="maximum alerts per time window")
     parser.add_argument("--window-seconds", type=int, default=900)
     parser.add_argument("--alpha", type=float, default=0.10)
     parser.add_argument("--alignment-tolerance", type=float, default=2.0)
     args = parser.parse_args()
-    report = run(args.flows_csv, args.eve_json, args.out, args.budget,
-                 args.window_seconds, args.alpha, args.alignment_tolerance)
+    report = run(args.flows_csv, args.eve_json, args.pcap, args.out, args.budget,
+                 args.window_seconds, args.alpha, args.alignment_tolerance, args.ruleset)
     print(json.dumps(report, indent=2))
 
 
