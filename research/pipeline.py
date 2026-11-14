@@ -140,7 +140,8 @@ def attach_suricata_alerts(flows, eve_path, tolerance_seconds=2.0):
             t = ts.timestamp()
             candidates = index[key]
             pos = bisect.bisect_right(starts[key], t + tolerance_seconds)
-            hits = [row_id for start, end, row_id in candidates[:pos]
+            first = bisect.bisect_left(prefix_max_end[key], t - tolerance_seconds, 0, pos)
+            hits = [row_id for start, end, row_id in candidates[first:pos]
                     if end + tolerance_seconds >= t]
             if not hits:
                 unmatched_reasons["time_not_overlapping"] += 1
@@ -288,12 +289,28 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
     test["pred_set_names"] = test.pred_set.map(
         lambda values: "|".join("Attack" if x == 1 else "Benign" for x in values))
     test.drop(columns=["flow_key", "pred_set"]).to_csv(out / "test_flows.csv", index=False)
+    set_sizes = np.array([len(values) for values in pred_sets], dtype=int)
+    covered = np.array([int(y) in values for y, values in zip(test.y, pred_sets)], dtype=bool)
+    conformal_diagnostics = {
+        "empirical_coverage": float(covered.mean()) if len(covered) else None,
+        "mean_set_size": float(set_sizes.mean()) if len(set_sizes) else None,
+        "empty_set_rate": float((set_sizes == 0).mean()) if len(set_sizes) else None,
+        "singleton_set_rate": float((set_sizes == 1).mean()) if len(set_sizes) else None,
+        "ambiguous_set_rate": float((set_sizes > 1).mean()) if len(set_sizes) else None,
+        "set_size_counts": {str(size): int((set_sizes == size).sum()) for size in (0, 1, 2)},
+    }
+    for item in per_window:
+        window_rows = test[test.window == item["window"]]
+        positions = window_rows.index.to_numpy() - test.index.min()
+        item["conformal_empirical_coverage"] = float(covered[positions].mean()) if len(positions) else None
+        item["conformal_mean_set_size"] = float(set_sizes[positions].mean()) if len(positions) else None
+
     report = {
         "dataset": "CIC-IDS2017 labeled flow CSV", "rows": n,
         "split_rows": {"train": len(train), "calibration": len(cal), "test": len(test)},
         "alert_budget_per_window": budget, "window_seconds": window_seconds,
         "conformal_alpha": alpha, "suricata_alignment": alignment,
-        "metrics": metrics, "per_window_metrics": per_window,
+        "metrics": metrics, "conformal_diagnostics": conformal_diagnostics,\n        "per_window_metrics": per_window,
     }
     (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     metadata = {
