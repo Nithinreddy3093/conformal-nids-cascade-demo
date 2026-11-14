@@ -236,7 +236,7 @@ def run(csv_path, eve_path, out_dir, budget, window_seconds, alpha, tolerance):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--flows-csv", required=True, help="CICFlowMeter labeled flow CSV")
-    parser.add_argument("--eve-json", required=True, help="Suricata EVE JSON from the matching PCAP")
+    parser.add_argument("--eve-json", required=True, help="Suricata EVE JSON from the matching PCAP")\n    parser.add_argument("--pcap", required=True, help="Source PCAP used to generate both inputs; recorded by SHA-256")\n    parser.add_argument("--ruleset", help="Optional Suricata rules file or directory to hash for provenance")
     parser.add_argument("--out", default="results/run-001")
     parser.add_argument("--budget", type=int, default=5, help="maximum alerts per time window")
     parser.add_argument("--window-seconds", type=int, default=900)
