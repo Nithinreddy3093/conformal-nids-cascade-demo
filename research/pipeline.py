@@ -231,7 +231,22 @@ def suricata_version():
         return "not available in pipeline environment"
 
 
-def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, tolerance, ruleset_path=None):
+def verify_replay_manifest(manifest_path, pcap_path, eve_path):
+    """Reject EVE/PCAP pairs that do not match the replay manifest hashes."""
+    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    expected_pcap = manifest.get("inputs", {}).get("pcap", {}).get("sha256")
+    expected_eve = manifest.get("eve_json", {}).get("sha256")
+    if not expected_pcap or not expected_eve:
+        raise ValueError("Replay manifest is missing PCAP or EVE SHA-256 values.")
+    if expected_pcap != sha256_path(pcap_path):
+        raise ValueError("PCAP hash does not match the Suricata replay manifest.")
+    if expected_eve != sha256_path(eve_path):
+        raise ValueError("EVE JSON hash does not match the Suricata replay manifest.")
+    return manifest
+
+
+def run(csv_path, eve_path, pcap_path, replay_manifest_path, out_dir, budget, window_seconds, alpha, tolerance, ruleset_path=None):
+    replay_manifest = verify_replay_manifest(replay_manifest_path, pcap_path, eve_path)
     flows = load_flows(csv_path)
     alignment = attach_suricata_alerts(flows, eve_path, tolerance)
     flows = flows.sort_values("timestamp").reset_index(drop=True)
@@ -319,6 +334,7 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
         "inputs": {
             "labeled_flows_csv": {"path": str(csv_path), "sha256": sha256_path(csv_path)},
             "suricata_eve_json": {"path": str(eve_path), "sha256": sha256_path(eve_path)},
+            "suricata_replay_manifest": {"path": str(replay_manifest_path), "sha256": sha256_path(replay_manifest_path)},
             "source_pcap": {"path": str(pcap_path), "sha256": sha256_path(pcap_path)},
             **({"suricata_ruleset": {"path": str(ruleset_path), "sha256": sha256_path(ruleset_path)}}
                if ruleset_path else {}),
@@ -326,7 +342,7 @@ def run(csv_path, eve_path, pcap_path, out_dir, budget, window_seconds, alpha, t
         "software": {
             "python": platform.python_version(), "numpy": np.__version__,
             "pandas": pd.__version__, "scikit_learn": __import__("sklearn").__version__,
-            "suricata": suricata_version(),
+            "suricata": replay_manifest.get("suricata_version", "unknown"),
         },
         "model": {"type": "RandomForestClassifier", "n_estimators": 300,
                   "min_samples_leaf": 2, "class_weight": "balanced", "random_state": 17},
@@ -344,6 +360,7 @@ def main():
     parser.add_argument("--flows-csv", required=True, help="CICFlowMeter labeled flow CSV")
     parser.add_argument("--eve-json", required=True, help="Suricata EVE JSON from the matching PCAP")
     parser.add_argument("--pcap", required=True, help="Source PCAP used for replay; recorded by SHA-256")
+    parser.add_argument("--replay-manifest", required=True, help="suricata_run.json produced by replay_suricata.py")
     parser.add_argument("--ruleset", help="Optional Suricata rule file or directory to record by SHA-256")
     parser.add_argument("--out", default="results/run-001")
     parser.add_argument("--budget", type=int, default=5, help="maximum alerts per time window")
@@ -351,8 +368,9 @@ def main():
     parser.add_argument("--alpha", type=float, default=0.10)
     parser.add_argument("--alignment-tolerance", type=float, default=2.0)
     args = parser.parse_args()
-    report = run(args.flows_csv, args.eve_json, args.pcap, args.out, args.budget,
-                 args.window_seconds, args.alpha, args.alignment_tolerance, args.ruleset)
+    report = run(args.flows_csv, args.eve_json, args.pcap, args.replay_manifest,
+                 args.out, args.budget, args.window_seconds, args.alpha,
+                 args.alignment_tolerance, args.ruleset)
     print(json.dumps(report, indent=2))
 
 
