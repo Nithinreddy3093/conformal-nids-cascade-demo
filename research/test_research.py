@@ -37,8 +37,15 @@ class ResearchPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             csv_path, eve_path = root / "flows.csv", root / "eve.json"
-            pd.DataFrame(columns).to_csv(csv_path, index=False)
+            good = pd.DataFrame(columns)
+            bad = pd.DataFrame({key: [values[0]] for key, values in columns.items()})
+            bad.loc[0, "Source IP"] = None
+            bad.loc[0, "Label"] = None
+            pd.concat([good, bad], ignore_index=True).to_csv(csv_path, index=False)
             flows = load_flows(csv_path)
+            self.assertEqual(flows.attrs["ingestion_audit"]["input_rows"], 2)
+            self.assertEqual(flows.attrs["ingestion_audit"]["retained_rows"], 1)
+            self.assertEqual(flows.attrs["ingestion_audit"]["dropped_rows"], 1)
             self.assertAlmostEqual(flows.iloc[0].duration, 2.0)
             self.assertAlmostEqual(flows.iloc[0]["iat"], .25)
             event = {
