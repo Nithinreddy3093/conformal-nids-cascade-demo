@@ -240,6 +240,8 @@ class ResearchPipelineTests(unittest.TestCase):
             self.assertTrue((out_path / "report.json").is_file())
             self.assertTrue((out_path / "run_metadata.json").is_file())
             self.assertTrue((out_path / "artifact_manifest.json").is_file())
+            metadata = json.loads((out_path / "run_metadata.json").read_text(encoding="utf-8"))
+            self.assertRegex(metadata["software"]["project_git_commit"], r"^[0-9a-f]{40}$")
             self.assertEqual(
                 verify_artifact_manifest(out_path / "artifact_manifest.json")["count"], 3
             )
