@@ -11,6 +11,8 @@ This branch adds the first real-data evaluation path to the synthetic web demo. 
 
 Dataset files are not included in this repository. Download them from the [official CIC-IDS2017 page](https://www.unb.ca/cic/datasets/ids-2017.html) and follow its citation and data-use terms.
 
+**Important: use the original `GeneratedLabelledFlows` CSV, not `MachineLearningCSV`.** The pipeline needs `Timestamp`, source/destination IPs and ports, `Protocol`, CICFlowMeter features, and `Label` on each flow row. The ML-only CSV omits flow identifiers and timestamps, so it cannot be aligned to Suricata alerts. Select the CSV and PCAP from the same capture, and record both file hashes.
+
 ## Replay one PCAP with Suricata
 
 Record the Suricata version and ruleset before each run. On Linux/WSL, replay the selected PCAP offline:
