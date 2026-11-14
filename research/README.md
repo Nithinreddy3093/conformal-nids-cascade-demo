@@ -29,11 +29,13 @@ python -m pip install -r requirements-research.txt
 python research/pipeline.py \
   --flows-csv /path/to/selected_labeled_flows.csv \
   --eve-json results/suricata/eve.json \
+  --pcap /path/to/selected.pcap \
   --out results/first-run \
   --budget 5 \
   --window-seconds 900 \
   --alpha 0.10 \
-  --alignment-tolerance 2.0
+  --alignment-tolerance 2.0 \
+  --ruleset /path/to/suricata/rules
 ```
 
 Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The metadata records SHA-256 hashes for the CSV, EVE log, source PCAP, and optional ruleset; software versions; and run parameters. The report includes pooled and per-window policy metrics and alert-alignment counts.
