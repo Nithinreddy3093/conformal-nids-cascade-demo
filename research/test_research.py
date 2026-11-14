@@ -29,7 +29,9 @@ class ResearchPipelineTests(unittest.TestCase):
             "Timestamp": ["7/7/2017 10:00:00 AM"], "Source IP": ["10.0.0.1"],
             "Source Port": [1234], "Destination IP": ["192.0.2.4"],
             "Destination Port": [443], "Protocol": [6], "Flow Duration": [1_000_000],
-            "Label": ["BENIGN"],
+            "Total Fwd Packets": [1], "Total Backward Packets": [1],
+            "Total Length of Fwd Packets": [50], "Total Length of Bwd Packets": [50],
+            "SYN Flag Count": [0], "Flow IAT Mean": [0], "Label": ["BENIGN"],
         }
         with tempfile.TemporaryDirectory() as directory:
             csv_path = Path(directory) / "flows.csv"
