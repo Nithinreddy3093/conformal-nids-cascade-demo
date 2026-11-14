@@ -46,13 +46,13 @@ python research/pipeline.py \
   --ruleset /path/to/suricata/rules
 ```
 
-Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The analysis step verifies the PCAP and EVE hashes against the replay manifest and fails on a mismatch. Run metadata records SHA-256 hashes, software versions, model settings, and parameters. The report includes pooled and per-window policy metrics and alert-alignment counts.
+Outputs are `report.json`, `test_flows.csv`, and `run_metadata.json`. The analysis step verifies the PCAP and EVE hashes against the replay manifest and fails on a mismatch. Run metadata records SHA-256 hashes, software versions, model settings, and parameters. The report includes ingestion drop counts, alert match/ambiguous/unmatched counts, pooled and per-window policy metrics, and empirical conformal coverage/set-size diagnostics.
 
 ## Alignment and evaluation details
 
 - Flow identity uses a direction-independent 5-tuple: endpoint addresses, ports, and protocol.
 - An EVE alert is assigned only when its timestamp falls within the CIC flow start/end interval plus the declared tolerance.
-- Unmatched alerts are counted by reason in `report.json`; they are never silently attached to the nearest unrelated flow.
+- Alerts that overlap multiple rows are counted as ambiguous and not assigned. Unmatched alerts are counted by reason in `report.json`; neither case is silently attached to a flow.
 - Rows are sorted by timestamp and split 60%/20%/20% into training, calibration, and test slices.
 - Calibration thresholds are learned from the middle slice; test labels are used only for evaluation.
 - The three policies are ML probability top-K, signature-only top-K, and signature-first plus conformal candidate triage. Each has a per-window cap.
